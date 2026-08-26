@@ -7,11 +7,11 @@
 -- DELIVERIES
 -- ============================================================
 CREATE TABLE deliveries (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
   -- Identity
   tracking_number TEXT UNIQUE NOT NULL,
-  tracking_token TEXT UNIQUE NOT NULL DEFAULT encode(gen_random_bytes(32), 'hex'),
+  tracking_token TEXT UNIQUE NOT NULL,
   ecosystem_company_id UUID REFERENCES ecosystem_companies(id),
   customer_id UUID REFERENCES profiles(id),
   created_by UUID REFERENCES profiles(id),
@@ -71,7 +71,7 @@ CREATE TABLE deliveries (
 -- DELIVERY STATUS HISTORY
 -- ============================================================
 CREATE TABLE delivery_status_history (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   delivery_id UUID NOT NULL REFERENCES deliveries(id) ON DELETE CASCADE,
   previous_status delivery_status,
   new_status delivery_status NOT NULL,
@@ -86,7 +86,7 @@ CREATE TABLE delivery_status_history (
 -- PROOF OF DELIVERY
 -- ============================================================
 CREATE TABLE proof_of_delivery (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   delivery_id UUID NOT NULL REFERENCES deliveries(id) ON DELETE CASCADE,
   rider_id UUID NOT NULL REFERENCES riders(id),
   recipient_name TEXT,
@@ -104,7 +104,7 @@ CREATE TABLE proof_of_delivery (
 -- RIDER LOCATIONS
 -- ============================================================
 CREATE TABLE rider_locations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   rider_id UUID NOT NULL REFERENCES riders(id) ON DELETE CASCADE,
   delivery_id UUID REFERENCES deliveries(id) ON DELETE SET NULL,
   latitude DOUBLE PRECISION NOT NULL,
@@ -116,7 +116,7 @@ CREATE TABLE rider_locations (
 -- NOTIFICATIONS
 -- ============================================================
 CREATE TABLE notifications (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   delivery_id UUID REFERENCES deliveries(id) ON DELETE SET NULL,
   type notification_type NOT NULL,
@@ -133,7 +133,7 @@ CREATE TABLE notifications (
 -- AUDIT LOGS
 -- ============================================================
 CREATE TABLE audit_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   actor_id UUID REFERENCES profiles(id),
   action TEXT NOT NULL,
   entity_type TEXT NOT NULL,
@@ -147,7 +147,7 @@ CREATE TABLE audit_logs (
 -- INTERNATIONAL SHIPPING REQUESTS
 -- ============================================================
 CREATE TABLE international_shipping_requests (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id UUID NOT NULL REFERENCES profiles(id),
   origin_country TEXT NOT NULL,
   destination_country TEXT NOT NULL,
@@ -167,7 +167,7 @@ CREATE TABLE international_shipping_requests (
 -- CARS
 -- ============================================================
 CREATE TABLE cars (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   make TEXT NOT NULL,
   model TEXT NOT NULL,
   year INTEGER NOT NULL,
@@ -188,7 +188,7 @@ CREATE TABLE cars (
 -- CAR IMAGES
 -- ============================================================
 CREATE TABLE car_images (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   car_id UUID NOT NULL REFERENCES cars(id) ON DELETE CASCADE,
   image_url TEXT NOT NULL,
   is_primary BOOLEAN NOT NULL DEFAULT false,
@@ -200,7 +200,7 @@ CREATE TABLE car_images (
 -- CAR INQUIRIES
 -- ============================================================
 CREATE TABLE car_inquiries (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   car_id UUID NOT NULL REFERENCES cars(id) ON DELETE CASCADE,
   user_id UUID REFERENCES profiles(id),
   name TEXT NOT NULL,

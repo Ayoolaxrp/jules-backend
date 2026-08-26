@@ -299,7 +299,7 @@ BEGIN
   v_pin := LPAD(FLOOR(RANDOM() * 1000000)::TEXT, 6, '0');
 
   -- Hash the PIN
-  v_hash := encode(digest(v_pin, 'sha256'), 'hex');
+  v_hash := md5(v_pin);
 
   -- Store only the hash
   UPDATE deliveries
@@ -339,7 +339,7 @@ BEGIN
   END IF;
 
   -- Hash the provided PIN
-  v_provided_hash := encode(digest(p_pin, 'sha256'), 'hex');
+  v_provided_hash := md5(p_pin);
 
   -- Compare
   IF v_hash = v_provided_hash THEN

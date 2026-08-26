@@ -4,9 +4,9 @@
 -- ============================================================
 
 -- Enable required extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- gen_random_uuid() is built-in to PostgreSQL 13+ (no uuid-ossp needed)
+-- pgcrypto needed for digest() (SHA-256 PIN hashing)
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-CREATE EXTENSION IF NOT EXISTS "postgis";
 
 -- ============================================================
 -- ENUM TYPES

@@ -4,76 +4,17 @@
 -- ============================================================
 
 -- ============================================================
--- ADD awaitiNG_QUOTE TO DELIVERY STATUS
--- The /request-delivery form creates deliveries with status awaiting_quote
--- for Lagos/Interstate/Truck types
+-- ADD awaitiNG_QUOTE TO DELIVERY STATUS ENUM
 -- ============================================================
-
--- We need to recreate the enum since PostgreSQL doesn't support ALTER TYPE ADD in all versions
--- First, create the new enum type
-CREATE TYPE delivery_status_v2 AS ENUM (
-  'awaiting_quote',
-  'created',
-  'priced',
-  'assigned',
-  'accepted',
-  'en_route_to_pickup',
-  'arrived_at_pickup',
-  'picked_up',
-  'in_transit',
-  'arriving',
-  'delivered',
-  'cancelled',
-  'failed',
-  'returning_to_sender',
-  'returned'
-);
-
--- Update the deliveries table to use the new enum
-ALTER TABLE deliveries
-  ALTER COLUMN status TYPE delivery_status_v2 USING status::text::delivery_status_v2;
-
--- Drop the old enum and rename the new one
-ALTER TYPE delivery_status RENAME TO delivery_status_old;
-ALTER TYPE delivery_status_v2 RENAME TO delivery_status;
-DROP TYPE delivery_status_old;
+ALTER TYPE delivery_status ADD VALUE IF NOT EXISTS 'awaiting_quote';
 
 -- ============================================================
--- UPDATE intl_request_status TO INCLUDE submitted
--- The /international form writes with status submitted
+-- ADD submitted TO intl_request_status ENUM
 -- ============================================================
-
-CREATE TYPE intl_request_status_v2 AS ENUM (
-  'submitted',
-  'pending',
-  'quoted',
-  'approved',
-  'in_transit',
-  'delivered',
-  'cancelled'
-);
-
-ALTER TABLE international_shipping_requests
-  ALTER COLUMN status TYPE intl_request_status_v2 USING status::text::intl_request_status_v2;
-
-ALTER TYPE intl_request_status RENAME TO intl_request_status_old;
-ALTER TYPE intl_request_status_v2 RENAME TO intl_request_status;
-DROP TYPE intl_request_status_old;
+ALTER TYPE intl_request_status ADD VALUE IF NOT EXISTS 'submitted';
 
 -- ============================================================
--- UPDATE delivery_status_history TO USE NEW ENUM
--- ============================================================
-
--- The delivery_status_history table references the old enum
--- We need to update it too
-ALTER TABLE delivery_status_history
-  ALTER COLUMN previous_status TYPE delivery_status USING previous_status::text::delivery_status;
-
-ALTER TABLE delivery_status_history
-  ALTER COLUMN new_status TYPE delivery_status USING new_status::text::delivery_status;
-
--- ============================================================
--- UPDATE FUNCTIONS THAT REFERENCE THE OLD ENUM
+-- UPDATE FUNCTIONS THAT REFERENCE THE ENUM
 -- ============================================================
 
 -- Update is_valid_transition function
@@ -146,17 +87,8 @@ BEGIN
   -- Generate tracking number
   v_tracking_number := generate_tracking_number();
 
-  -- Determine initial status based on delivery type
-  -- Air/Sea/Courier should go to international_shipping_requests, not deliveries
-  -- But if they come here, set to awaiting_quote
-  IF p_delivery_type IN ('air_freight', 'sea_freight', 'international_courier') THEN
-    -- These should be routed to international_shipping_requests by the frontend
-    -- But if they end up here, mark as awaiting_quote
-    v_initial_status := 'awaiting_quote'::delivery_status;
-  ELSE
-    -- Lagos/Interstate/Truck start as awaiting_quote
-    v_initial_status := 'awaiting_quote'::delivery_status;
-  END IF;
+  -- All deliveries start as awaiting_quote
+  v_initial_status := 'awaiting_quote'::delivery_status;
 
   -- Create delivery
   INSERT INTO deliveries (
@@ -378,7 +310,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================================
 
 CREATE TABLE support_enquiries (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   full_name TEXT NOT NULL,
   email TEXT NOT NULL,
   phone TEXT,

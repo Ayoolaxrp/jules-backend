@@ -15,6 +15,25 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================================
+-- TRACKING TOKEN GENERATION TRIGGER
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION generate_tracking_token()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.tracking_token IS NULL THEN
+    NEW.tracking_token := md5(random()::text || clock_timestamp()::text || NEW.id::text);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER on_delivery_tracking_token
+  BEFORE INSERT ON deliveries
+  FOR EACH ROW
+  EXECUTE FUNCTION generate_tracking_token();
+
+-- ============================================================
 -- APPLY UPDATED_AT TRIGGERS
 -- ============================================================
 

@@ -3,11 +3,12 @@
 -- Core Tables: Profiles, Riders, Vehicles, Ecosystem Companies
 -- ============================================================
 
+
 -- ============================================================
 -- PROFILES
 -- ============================================================
 CREATE TABLE profiles (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   auth_user_id UUID UNIQUE NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   first_name TEXT NOT NULL DEFAULT '',
   last_name TEXT NOT NULL DEFAULT '',
@@ -45,7 +46,7 @@ CREATE TRIGGER on_auth_user_created
 -- ECOSYSTEM COMPANIES
 -- ============================================================
 CREATE TABLE ecosystem_companies (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
   description TEXT,
@@ -57,7 +58,7 @@ CREATE TABLE ecosystem_companies (
 -- RIDERS
 -- ============================================================
 CREATE TABLE riders (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   profile_id UUID UNIQUE NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   employee_id TEXT UNIQUE,
   phone TEXT NOT NULL DEFAULT '',
@@ -77,7 +78,7 @@ CREATE TABLE riders (
 -- VEHICLES
 -- ============================================================
 CREATE TABLE vehicles (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   vehicle_code TEXT UNIQUE NOT NULL,
   vehicle_type vehicle_type NOT NULL DEFAULT 'dispatch_bike',
   registration_number TEXT,
@@ -99,7 +100,7 @@ ALTER TABLE riders
 -- PRICING RULES
 -- ============================================================
 CREATE TABLE pricing_rules (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   delivery_type delivery_type NOT NULL,
   base_price NUMERIC(10,2) NOT NULL DEFAULT 0,
@@ -118,10 +119,14 @@ CREATE TABLE pricing_rules (
 -- DELIVERY ZONES
 -- ============================================================
 CREATE TABLE delivery_zones (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   description TEXT,
-  boundary GEOGRAPHY(POLYGON, 4326),
+  -- Simple bounding box for V1 (no PostGIS dependency)
+  min_latitude NUMERIC(9,6),
+  max_latitude NUMERIC(9,6),
+  min_longitude NUMERIC(9,6),
+  max_longitude NUMERIC(9,6),
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
