@@ -1,0 +1,155 @@
+{
+  "name": "Revenue Recovery System",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-weekly",
+      "name": "Run Weekly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Segment dormant leads from database\n// In production: query Supabase for leads inactive > 30 days\n\nconst now = new Date();\nconst THIRTY_DAYS = 30 * 24 * 3600000;\nconst SIXTY_DAYS = 60 * 24 * 3600000;\nconst NINETY_DAYS = 90 * 24 * 3600000;\n\n// Mock database (replace with Supabase query)\nconst allContacts = [\n  // Dormant leads (30-60 days inactive)\n  {\n    contact_id: 'RCV-001',\n    name: 'Tunde Adeyemi',\n    email: 'tunde@techcorp.ng',\n    phone: '+2348011112222',\n    type: 'lead',\n    source: 'meta_ads',\n    last_activity: new Date(now - 35 * 86400000).toISOString(),\n    total_interactions: 3,\n    last_purchase: null,\n    lifetime_value: 0,\n    tags: ['enterprise', 'interested']\n  },\n  {\n    contact_id: 'RCV-002',\n    name: 'Ngozi Obi',\n    email: 'ngozi@fashionhouse.com',\n    phone: '+2348033334444',\n    type: 'previous_customer',\n    source: 'website',\n    last_activity: new Date(now - 45 * 86400000).toISOString(),\n    total_interactions: 8,\n    last_purchase: new Date(now - 120 * 86400000).toISOString(),\n    lifetime_value: 350000,\n    tags: ['fashion', 'repeat_buyer']\n  },\n  {\n    contact_id: 'RCV-003',\n    name: 'Yusuf Abdullahi',\n    email: 'yusuf@tradingco.ng',\n    phone: '+2348055556666',\n    type: 'dormant_lead',\n    source: 'whatsapp',\n    last_activity: new Date(now - 75 * 86400000).toISOString(),\n    total_interactions: 2,\n    last_purchase: null,\n    lifetime_value: 0,\n    tags: ['logistics', 'interstate']\n  },\n  {\n    contact_id: 'RCV-004',\n    name: 'Blessing Eze',\n    email: 'blessing@realestate.ng',\n    phone: '+2348077778888',\n    type: 'previous_customer',\n    source: 'referral',\n    last_activity: new Date(now - 95 * 86400000).toISOString(),\n    total_interactions: 12,\n    last_purchase: new Date(now - 180 * 86400000).toISOString(),\n    lifetime_value: 750000,\n    tags: ['real_estate', 'high_value']\n  },\n  {\n    contact_id: 'RCV-005',\n    name: 'Kola Martins',\n    email: 'kola@logistics.ng',\n    phone: '+2348099990000',\n    type: 'dormant_lead',\n    source: 'website',\n    last_activity: new Date(now - 150 * 86400000).toISOString(),\n    total_interactions: 1,\n    last_purchase: null,\n    lifetime_value: 0,\n    tags: ['logistics', 'new']\n  }\n];\n\n// Segment contacts\nconst segments = {\n  warm_dormant: [],    // 30-60 days\n  cold_dormant: [],    // 60-90 days\n  frozen: [],          // 90+ days\n  high_value: []       // Any dormant with lifetime_value > 100000\n};\n\nfor (const contact of allContacts) {\n  const daysSinceActivity = (now - new Date(contact.last_activity)) / 86400000;\n  \n  if (contact.lifetime_value > 100000) {\n    segments.high_value.push({ ...contact, days_inactive: Math.floor(daysSinceActivity), segment: 'high_value' });\n  }\n  \n  if (daysSinceActivity >= 90) {\n    segments.frozen.push({ ...contact, days_inactive: Math.floor(daysSinceActivity), segment: 'frozen' });\n  } else if (daysSinceActivity >= 60) {\n    segments.cold_dormant.push({ ...contact, days_inactive: Math.floor(daysSinceActivity), segment: 'cold_dormant' });\n  } else if (daysSinceActivity >= 30) {\n    segments.warm_dormant.push({ ...contact, days_inactive: Math.floor(daysSinceActivity), segment: 'warm_dormant' });\n  }\n}\n\n// Return all contacts that need reactivation\nconst needsReactivation = [\n  ...segments.high_value,\n  ...segments.frozen,\n  ...segments.cold_dormant,\n  ...segments.warm_dormant\n].filter((contact, index, self) => \n  index === self.findIndex(c => c.contact_id === contact.contact_id)\n);\n\nif (needsReactivation.length === 0) {\n  return [{ json: { status: 'no_dormant_contacts', count: 0 } }];\n}\n\nreturn needsReactivation.map(contact => ({ json: contact }));"
+      },
+      "id": "segment-contacts",
+      "name": "Segment Dormant Contacts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.count }}",
+              "operation": "largerEqual",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "has-dormant",
+      "name": "Has Dormant Contacts?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate personalized reactivation message based on segment and history\nconst contact = $input.first().json;\n\nlet whatsappMessage = '';\nlet emailSubject = '';\nlet emailBody = '';\nlet campaignType = '';\nlet channel = 'whatsapp';\n\nswitch (contact.segment) {\n  case 'high_value':\n    campaignType = 'VIP_RECOVERY';\n    whatsappMessage = `Hi ${contact.name}! 👋\\n\\nIt's been a while since we last worked together. As one of our valued clients, we wanted to personally reach out.\\n\\nWe've made some exciting updates to our services that I think you'd love. Would you be open to a quick chat this week?\\n\\nBest regards,\\nThe Jules Luxury Team`;\n    emailSubject = `We miss working with you, ${contact.name}`;\n    emailBody = `Hi ${contact.name},<br><br>It's been ${contact.days_inactive} days since we last connected, and we wanted to reach out personally.<br><br>As a valued client, your experience matters to us. We've been making some exciting improvements and would love to show you what's new.<br><br>Would you have 15 minutes this week for a catch-up call?<br><br>Best regards,<br>Jules Luxury Team`;\n    break;\n    \n  case 'frozen':\n    campaignType = 'REACTIVATION';\n    channel = 'email';\n    whatsappMessage = null;\n    emailSubject = `We'd love to reconnect - ${contact.name}`;\n    emailBody = `Hi ${contact.name},<br><br>It's been a while! We noticed you haven't been active recently and wanted to check in.<br><br>Whether your needs have changed or you simply got busy, we're here when you're ready.<br><br>As a special offer, we're providing a 10% discount on your next service. Just reply to this email to claim it.<br><br>Best regards,<br>Jules Luxury Team`;\n    break;\n    \n  case 'cold_dormant':\n    campaignType = 'NURTURE';\n    whatsappMessage = `Hi ${contact.name}! 😊\\n\\nHope you're doing well! We've been sharing some helpful content lately about logistics optimization. Thought you might find it useful.\\n\\nWould you like us to send you our latest guide? Just reply YES!\\n\\n- Jules Luxury Team`;\n    emailSubject = `Helpful resources for you - ${contact.name}`;\n    emailBody = `Hi ${contact.name},<br><br>We've been working on some great resources that might help your business. Here are a few highlights:<br><br>• Logistics cost optimization guide<br>• Delivery efficiency checklist<br>• Customer retention strategies<br><br>Would you like us to send these to you?<br><br>Best regards,<br>Jules Luxury Team`;\n    break;\n    \n  case 'warm_dormant':\n    campaignType = 'GENTLE_REMINDER';\n    whatsappMessage = `Hi ${contact.name}! 👋\\n\\nJust a friendly check-in! We haven't heard from you in a while and wanted to make sure everything is going well.\\n\\nIs there anything we can help you with? We're just a message away!\\n\\n- Jules Luxury Team`;\n    emailSubject = `Just checking in - ${contact.name}`;\n    emailBody = `Hi ${contact.name},<br><br>Just a quick note to say hello! We hope everything is going well with your business.<br><br>If you need anything - from logistics support to a simple chat about your needs - we're here.<br><br>Best regards,<br>Jules Luxury Team`;\n    break;\n}\n\nreturn [{\n  json: {\n    ...contact,\n    campaign_type: campaignType,\n    channel: channel,\n    whatsapp_message: whatsappMessage,\n    email_subject: emailSubject,\n    email_body: emailBody,\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "generate-reactivation",
+      "name": "Generate Reactivation Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Create campaign entry and schedule follow-up\nconst contact = $input.first().json;\n\nconst campaignEntry = {\n  campaign_id: `CAMP-${Date.now()}-${contact.contact_id}`,\n  contact_id: contact.contact_id,\n  name: contact.name,\n  email: contact.email,\n  phone: contact.phone,\n  campaign_type: contact.campaign_type,\n  segment: contact.segment,\n  channel: contact.channel,\n  status: 'sent',\n  sent_at: new Date().toISOString(),\n  response_received: false,\n  follow_up_scheduled: true,\n  follow_up_at: new Date(Date.now() + 7 * 86400000).toISOString(),\n  conversion_tracked: false,\n  notes: []\n};\n\nreturn [{ json: campaignEntry }];"
+      },
+      "id": "create-campaign",
+      "name": "Create Campaign Entry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate analytics and summary\nconst contact = $input.first().json;\n\nconst summary = {\n  campaign_id: contact.campaign_id,\n  contact: contact.name,\n  segment: contact.segment,\n  campaign_type: contact.campaign_type,\n  channel: contact.channel,\n  days_inactive: contact.days_inactive,\n  lifetime_value: contact.lifetime_value,\n  potential_revenue: contact.lifetime_value > 0 ? contact.lifetime_value * 0.3 : 150000,\n  status: 'reactivation_sent',\n  next_action: 'wait_for_response',\n  follow_up_date: contact.follow_up_at,\n  timestamp: new Date().toISOString()\n};\n\nreturn [{ json: summary }];"
+      },
+      "id": "analytics",
+      "name": "Campaign Analytics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reactivation-response",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-response",
+      "name": "Response Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 520],
+      "webhookId": "reactivation-response-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process reactivation response\nconst response = $input.first().json.body;\n\nconst result = {\n  contact_id: response.contact_id,\n  response_type: 'reactivation_replied',\n  response_channel: response.channel || 'whatsapp',\n  response_message: response.message || '',\n  sentiment: response.message?.toLowerCase().includes('yes') || response.message?.toLowerCase().includes('interested') ? 'positive' : 'neutral',\n  handoff_to_sales: true,\n  priority: response.lifetime_value > 100000 ? 'high' : 'normal',\n  timestamp: new Date().toISOString()\n};\n\nreturn [{ json: result }];"
+      },
+      "id": "process-reactivation-response",
+      "name": "Process Reactivation Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 520]
+    },
+    {
+      "parameters": {
+        "jsCode": "// No dormant contacts found\nreturn [{\n  json: {\n    status: 'no_dormant_contacts',\n    message: 'All contacts are active. No reactivation needed.',\n    checked_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "no-dormant",
+      "name": "No Dormant Contacts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 420]
+    }
+  ],
+  "connections": {
+    "Run Weekly": {
+      "main": [
+        [{ "node": "Segment Dormant Contacts", "type": "main", "index": 0 }]
+      ]
+    },
+    "Segment Dormant Contacts": {
+      "main": [
+        [{ "node": "Has Dormant Contacts?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Dormant Contacts?": {
+      "main": [
+        [{ "node": "Generate Reactivation Message", "type": "main", "index": 0 }],
+        [{ "node": "No Dormant Contacts", "type": "main", "index": 0 }]
+      ]
+    },
+    "Generate Reactivation Message": {
+      "main": [
+        [{ "node": "Create Campaign Entry", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Campaign Entry": {
+      "main": [
+        [{ "node": "Campaign Analytics", "type": "main", "index": 0 }]
+      ]
+    },
+    "Response Webhook": {
+      "main": [
+        [{ "node": "Process Reactivation Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "Revenue Recovery" },
+    { "name": "Automation" }
+  ]
+}
